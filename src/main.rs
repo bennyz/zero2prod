@@ -1,6 +1,4 @@
-use lib::run;
-
-mod lib;
+use zero2prod::startup::run;
 
 #[tokio::main]
 async fn main() {
