@@ -1,11 +1,22 @@
 use std::{error, net::SocketAddr};
 
-use crate::routes::app;
+use sqlx::postgres::PgPoolOptions;
 
-pub async fn run() -> Result<(), Box<dyn error::Error>> {
-    let app = app();
+use crate::{configuration, routes::app};
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+pub async fn run(address: String) -> Result<(), Box<dyn error::Error>> {
+    let db = PgPoolOptions::new()
+        .connect(
+            &configuration::get_configuration()
+                .unwrap()
+                .database
+                .connection_string(),
+        )
+        .await?;
+
+    let app = app(db);
+
+    let addr = SocketAddr::from(address.parse::<SocketAddr>()?);
     println!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
