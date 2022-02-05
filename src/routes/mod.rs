@@ -17,6 +17,6 @@ pub struct ApiContext {
 pub fn app(db: PgPool) -> Router {
     Router::new()
         .route("/health_check", get(health_check))
-        .route("/subscribtions", post(subscribe))
+        .route("/subscriptions", post(subscribe))
         .layer(AddExtensionLayer::new(ApiContext { db }))
 }

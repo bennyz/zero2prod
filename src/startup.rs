@@ -1,26 +1,18 @@
-use std::{error, net::SocketAddr};
+use axum::{routing::IntoMakeService, Router, Server};
+use hyper::server::conn::AddrIncoming;
+use sqlx::PgPool;
+use std::net::TcpListener;
 
-use sqlx::postgres::PgPoolOptions;
+use crate::routes::app;
 
-use crate::{configuration, routes::app};
+pub async fn run(
+    listener: TcpListener,
+    db_pool: PgPool,
+) -> Result<Server<AddrIncoming, IntoMakeService<Router>>, std::io::Error> {
+    let app = app(db_pool);
+    let server = axum::Server::from_tcp(listener)
+        .unwrap()
+        .serve(app.into_make_service());
 
-pub async fn run(address: String) -> Result<(), Box<dyn error::Error>> {
-    let db = PgPoolOptions::new()
-        .connect(
-            &configuration::get_configuration()
-                .unwrap()
-                .database
-                .connection_string(),
-        )
-        .await?;
-
-    let app = app(db);
-
-    let addr = SocketAddr::from(address.parse::<SocketAddr>()?);
-    println!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
-
-    Ok(())
+    Ok(server)
 }
