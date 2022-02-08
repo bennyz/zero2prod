@@ -5,6 +5,7 @@ use axum::{
 use hyper::StatusCode;
 use serde::Deserialize;
 use sqlx::types::chrono::Utc;
+use tracing::Instrument;
 use uuid::Uuid;
 
 use super::ApiContext;
@@ -17,12 +18,9 @@ pub struct FormData {
 
 pub async fn subscribe(input: Form<FormData>, ctx: Extension<ApiContext>) -> impl IntoResponse {
     let request_id = Uuid::new_v4();
-    tracing::info!(
-        "request_id {} - Adding '{}' '{}' as a new subscriber.",
-        request_id,
-        input.email,
-        input.name
-    );
+    let request_span = tracing::info_span!("Adding a new subscriber.", %request_id, subscriber_email = %input.email, subscriber_name= %input.name);
+    let _request_span_guard = request_span.enter();
+    let query_span = tracing::info_span!("Saving new subscriber details in the database");
 
     match sqlx::query!(
         r#"
@@ -35,6 +33,7 @@ pub async fn subscribe(input: Form<FormData>, ctx: Extension<ApiContext>) -> imp
         Utc::now()
     )
     .execute(&ctx.db)
+    .instrument(query_span)
     .await
     {
         Ok(_) => {
