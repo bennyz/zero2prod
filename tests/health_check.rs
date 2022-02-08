@@ -27,9 +27,7 @@ async fn spawn_app() -> TestApp {
     configuration.database.database_name = Uuid::new_v4().to_string();
     let connection_pool = configure_database(&configuration.database).await;
 
-    let server = run(listener, connection_pool.clone())
-        .await
-        .expect("Failed to run server");
+    let server = run(listener, connection_pool.clone()).expect("Failed to run server");
 
     let _ = tokio::spawn(server);
 
