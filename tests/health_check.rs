@@ -5,11 +5,9 @@ use axum::{
     http::{Method, Request, StatusCode},
 };
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use tower::ServiceExt;
 use uuid::Uuid;
 use zero2prod::{
     configuration::{get_configuration, DatabaseSettings},
-    routes::app,
     startup::run,
 };
 
