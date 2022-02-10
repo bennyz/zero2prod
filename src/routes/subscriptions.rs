@@ -4,7 +4,7 @@ use axum::{
 };
 use hyper::StatusCode;
 use serde::Deserialize;
-use sqlx::types::chrono::Utc;
+use sqlx::{types::chrono::Utc, PgPool};
 use tracing::Instrument;
 use uuid::Uuid;
 
@@ -16,13 +16,28 @@ pub struct FormData {
     email: String,
 }
 
+#[tracing::instrument(
+    name = "Adding a new subscriber",
+    skip(input, ctx),
+    fields(
+    request_id = %Uuid::new_v4(),
+    subscriber_email = %input.email,
+    subscriber_name= %input.name
+    )
+)]
 pub async fn subscribe(input: Form<FormData>, ctx: Extension<ApiContext>) -> impl IntoResponse {
-    let request_id = Uuid::new_v4();
-    let request_span = tracing::info_span!("Adding a new subscriber.", %request_id, subscriber_email = %input.email, subscriber_name= %input.name);
-    let _request_span_guard = request_span.enter();
-    let query_span = tracing::info_span!("Saving new subscriber details in the database");
+    match insert_subscriber(&ctx.db, &input).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
 
-    match sqlx::query!(
+#[tracing::instrument(
+    name = "Saving new subscriber details in the database",
+    skip(input, pool)
+)]
+pub async fn insert_subscriber(pool: &PgPool, input: &FormData) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
@@ -32,24 +47,11 @@ pub async fn subscribe(input: Form<FormData>, ctx: Extension<ApiContext>) -> imp
         input.name,
         Utc::now()
     )
-    .execute(&ctx.db)
-    .instrument(query_span)
+    .execute(pool)
     .await
-    {
-        Ok(_) => {
-            tracing::info!(
-                "request_id {} - New subscriber details have been saved",
-                request_id
-            );
-            StatusCode::OK
-        }
-        Err(e) => {
-            tracing::error!(
-                "request_id {} - Failed to execute query: {:?}",
-                request_id,
-                e
-            );
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-    }
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
+    Ok(())
 }
