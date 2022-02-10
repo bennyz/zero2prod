@@ -5,7 +5,6 @@ use axum::{
 use hyper::StatusCode;
 use serde::Deserialize;
 use sqlx::{types::chrono::Utc, PgPool};
-use tracing::Instrument;
 use uuid::Uuid;
 
 use super::ApiContext;
