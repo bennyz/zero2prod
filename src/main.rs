@@ -13,12 +13,14 @@ async fn main() -> std::io::Result<()> {
     init_subscriber(subscriber);
     let configuration = get_configuration().expect("Failed to read configuration.");
 
-    let address = format!("0.0.0.0:{}", configuration.application_port);
-    println!("running on {}...", &address);
+    let address = format!(
+        "{}:{}",
+        configuration.application.host, configuration.application.port
+    );
 
+    tracing::info!("Starting zero2prod on {}", address);
     let listener = TcpListener::bind(address)?;
-    let connection_pool = PgPool::connect(&configuration.database.connection_string())
-        .await
+    let connection_pool = PgPool::connect_lazy(&configuration.database.connection_string())
         .expect("Failed to connect to database.");
 
     match run(listener, connection_pool) {
