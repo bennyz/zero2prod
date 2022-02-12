@@ -135,7 +135,40 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
         let body = String::from_utf8(bytes.to_vec()).unwrap();
         println!("body {}", body);
         // TODO check error message
-
         assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+}
+
+#[tokio::test]
+async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
+    // Arrange
+    let app = spawn_app().await;
+    let client = hyper::client::Client::new();
+    let test_cases = vec![
+        ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
+        ("name=Ursula&email=", "empty email"),
+        ("name=Ursula&email=definitely-not-an-email", "invalid email"),
+    ];
+    for (body, description) in test_cases {
+        // Act
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(format!("{}/subscriptions", app.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body.into())
+            .unwrap();
+
+        let response = client
+            .request(req)
+            .await
+            .expect("Failed to execute request.");
+
+        // Assert
+        assert_eq!(
+            StatusCode::BAD_REQUEST,
+            response.status().as_u16(),
+            "The API did not return a 400 OK when the payload was {}.",
+            description
+        );
     }
 }
