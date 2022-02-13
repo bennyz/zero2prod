@@ -25,7 +25,7 @@ pub fn app(db: PgPool) -> Router {
         .layer(AddExtensionLayer::new(ApiContext { db }))
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
-                tracing::debug_span!(
+                tracing::info_span!(
                     "HTTP",
                     http.method = %request.method(),
                     http.url = %request.uri(),
