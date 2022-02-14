@@ -10,6 +10,7 @@ pub use subscriptions::*;
 
 use axum::routing::post;
 use axum::{self, routing::get, Router};
+use tower::ServiceBuilder;
 use tower_http::request_id::{
     MakeRequestId, PropagateRequestIdLayer, RequestId, SetRequestIdLayer,
 };
@@ -26,28 +27,28 @@ pub fn app(db: PgPool) -> Router {
     Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
-        .layer(AddExtensionLayer::new(ApiContext { db }))
         .layer(
-            TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
-                let request_id = request
-                    .extensions()
-                    .get::<RequestId>()
-                    .and_then(|id| id.header_value().to_str().ok())
-                    .unwrap_or_default();
+            ServiceBuilder::new()
+                .layer(PropagateRequestIdLayer::new(x_request_id.clone()))
+                .layer(SetRequestIdLayer::new(x_request_id, MakeRequestUuid))
+                .layer(
+                    TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+                        let request_id = request
+                            .extensions()
+                            .get::<RequestId>()
+                            .and_then(|id| id.header_value().to_str().ok())
+                            .unwrap_or_default();
 
-                tracing::info_span!(
-                    "HTTP",
-                    http.method = %request.method(),
-                    http.url = %request.uri(),
-                    request_id = %request_id,
+                        tracing::info_span!(
+                            "HTTP",
+                            http.method = %request.method(),
+                            http.url = %request.uri(),
+                            request_id = %request_id,
+                        )
+                    }),
                 )
-            }),
+                .layer(AddExtensionLayer::new(ApiContext { db })),
         )
-        .layer(SetRequestIdLayer::new(
-            x_request_id.clone(),
-            MakeRequestUuid,
-        ))
-        .layer(PropagateRequestIdLayer::new(x_request_id))
 }
 
 #[derive(Clone, Copy)]
